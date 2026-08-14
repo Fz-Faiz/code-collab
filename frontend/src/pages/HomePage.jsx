@@ -88,7 +88,7 @@ const HomePage = () => {
       <div className=" bottom-0 fixed text-sm text-gray-500">
         Made with ❤️ by{" "}
         <a
-          href=""
+          href="https://github.com/Fz-Faiz"
           className="text-green-400 hover:underline"
         >
           Fz-Faiz
