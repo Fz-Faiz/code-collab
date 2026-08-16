@@ -36,15 +36,29 @@ const EditorPage = () => {
       })
 
       // Listening for joined events
-      socketRef.current.on(ACTIONS.JOINED, ({clients, username, sockedId}) => {
+      socketRef.current.on(ACTIONS.JOINED, ({clients, username, socketId}) => {
           if( username !== location.state?.username){
               toast.success(`${username} joined the room.`)
               console.log(`${username} joined`)
           }
           setClients(clients)
       })
+
+      // Listening for disconnected events
+      socketRef.current.on(ACTIONS.DISCONNECTED, ({socketId, username}) => {
+			toast.success(`${username} left the room`);
+			setClients((prev) => {
+				return prev.filter( client => client.socketId !== socketId)
+			})		
+      })
     }
     init()
+	return () => {
+		socketRef.current?.disconnect();
+		socketRef.current?.off(ACTIONS.JOINED)
+		socketRef.current?.off(ACTIONS.DISCONNECTED)
+	}
+	
   },[])
 
   
