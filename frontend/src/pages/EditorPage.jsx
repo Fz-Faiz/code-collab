@@ -1,4 +1,4 @@
-import {  useEffect,  useState } from "react";
+import {  useEffect,  useState, useRef } from "react";
 import Client from "../components/Client";
 import Editor from "../components/Editor";
 import {initSocket} from "../socket.js"
@@ -13,6 +13,7 @@ const EditorPage = () => {
   const { roomId } = useParams();
   const [clients, setClients] = useState([]);
   const [socket, setSocket] = useState(null)
+  const codeRef = useRef(null)
   
 
   useEffect(() => {
@@ -28,11 +29,16 @@ const EditorPage = () => {
         reactNavigator("/")
       }
 
-      const handleJoined = ({clients, username}) => {
+      const handleJoined = ({clients, username, socketId}) => {
         if(username !== location.state?.username){
           toast.success(`${username} joined the room`)
         }
         setClients(clients);
+        newSocket.emit(ACTIONS.SYNC_CODE, {
+          code: codeRef.current,
+          socketId,
+        })
+
       }
 
       const handleDisconnected = ({socketId, username}) => {
@@ -75,7 +81,19 @@ const EditorPage = () => {
 	
   },[])
 
+  const handleCopyRoomId = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId)
+      toast.success("Room ID has been copied")
+    } catch (error) {
+      toast.success("Could not copy the Room Id")
+      console.log(error)
+    }
+  }
   
+  const handleLeaveRoom = () => {
+    reactNavigator('/')
+  }
 
   if(!location.state){
     return <Navigate to="/" />
@@ -108,11 +126,11 @@ const EditorPage = () => {
 
         {/* Bottom Buttons */}
         <div className="space-y-3">
-          <button className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-100 text-black font-medium transition">
+          <button onClick={handleCopyRoomId} className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-100 text-black font-medium transition cursor-pointer">
             Copy Room ID
           </button>
 
-          <button className="w-full bg-green-500 py-2 rounded-lg hover:bg-green-600 text-black font-medium transition">
+          <button onClick={handleLeaveRoom} className="w-full bg-green-500 py-2 rounded-lg hover:bg-green-600 text-black font-medium transition cursor-pointer">
             Leave
           </button>
         </div>
@@ -120,7 +138,7 @@ const EditorPage = () => {
 
       {/* Editor */}
       <div className="flex-1">
-        {socket && <Editor socket={socket} roomId={roomId} />}
+        {socket && <Editor socket={socket} roomId={roomId} onCodeChange={(code) => {codeRef.current = code}}/>}
       </div>
     </div>
   );

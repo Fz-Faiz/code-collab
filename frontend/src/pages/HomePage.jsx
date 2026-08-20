@@ -12,7 +12,6 @@ const HomePage = () => {
     const id = uuidV4();
     setRoomId(id);
     toast.success("Created a new room")
-    console.log(id)
   }
   const joinRoom = () => {
     if(!username || !roomId){

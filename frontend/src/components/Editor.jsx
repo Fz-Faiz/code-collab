@@ -7,7 +7,7 @@ import { html } from "@codemirror/lang-html";
 import { autoCloseTags } from "@codemirror/lang-html";
 import ACTIONS from '../action';
  
-const Editor = ({socket, roomId}) => {
+const Editor = ({socket, roomId, onCodeChange}) => {
   const editorContainerRef = useRef(null);
   const editorViewRef = useRef(null);
   const isRemoteChange = useRef(false);
@@ -24,7 +24,10 @@ const Editor = ({socket, roomId}) => {
         EditorView.updateListener.of((update) => {
           if(!update.docChanged) return;
           if(isRemoteChange.current) return;
+
           const code = update.state.doc.toString();
+
+          onCodeChange(code);
           
           if(socket){
             socket.emit(ACTIONS.CODE_CHANGE, {
@@ -49,7 +52,10 @@ const Editor = ({socket, roomId}) => {
 
       const currentCode = editorViewRef.current.state.doc.toString();
 
+      
+
       if(currentCode == code) return;
+
 
       // We did this to prevent remote changes to prevent updateListener fires (we will stuck in a loop)
       // only local changes +input we send to server
