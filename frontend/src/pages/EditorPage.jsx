@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import {  useEffect,  useState } from "react";
 import Client from "../components/Client";
 import Editor from "../components/Editor";
 import {initSocket} from "../socket.js"
@@ -8,55 +8,69 @@ import toast from "react-hot-toast";
 
 
 const EditorPage = () => {
-  const socketRef = useRef(null);
   const location = useLocation();
   const reactNavigator = useNavigate();
   const { roomId } = useParams();
   const [clients, setClients] = useState([]);
+  const [socket, setSocket] = useState(null)
   
 
   useEffect(() => {
+    let newSocket;
     const init = async () => {
-      socketRef.current = await initSocket();
 
-      // Errors
+      newSocket = await initSocket();
+      setSocket(newSocket)
 
-      socketRef.current.on('connect_error', (err) => handleErrors(err));
-      socketRef.current.on('connect_failed', (err) => handleErrors(err));
-
-      function handleErrors(e) {
-        console.log('socket error', e);
-        toast.error('Socket connection failed, try again later.');
-        reactNavigator('/');
+      const handleErrors = (err) => {
+        console.log("socket error", err)
+        toast.error("Socket connection failed, try again later.")
+        reactNavigator("/")
       }
 
-      socketRef.current.emit(ACTIONS.JOIN, {
+      const handleJoined = ({clients, username}) => {
+        if(username !== location.state?.username){
+          toast.success(`${username} joined the room`)
+        }
+        setClients(clients);
+      }
+
+      const handleDisconnected = ({socketId, username}) => {
+        toast.success(`${username} left the room`)
+
+        setClients((prev) => {
+          return prev.filter((client) => client.socketId !== socketId)
+        })
+      }
+      
+      // Handling Errors
+      newSocket.on("connect_error", handleErrors)
+      newSocket.on("connect_failed", handleErrors)
+
+      // Listening for Joined events
+      newSocket.on(ACTIONS.JOINED, handleJoined)
+
+      // Listening for Disconnected events
+      newSocket.on(ACTIONS.DISCONNECTED, handleDisconnected)
+
+      // Sending my information to server (socketId, roomId, username)
+      newSocket.emit(ACTIONS.JOIN, {
         roomId,
-        username: location.state?.username
-      })
-
-      // Listening for joined events
-      socketRef.current.on(ACTIONS.JOINED, ({clients, username, socketId}) => {
-          if( username !== location.state?.username){
-              toast.success(`${username} joined the room.`)
-              console.log(`${username} joined`)
-          }
-          setClients(clients)
-      })
-
-      // Listening for disconnected events
-      socketRef.current.on(ACTIONS.DISCONNECTED, ({socketId, username}) => {
-			toast.success(`${username} left the room`);
-			setClients((prev) => {
-				return prev.filter( client => client.socketId !== socketId)
-			})		
+        username: location.state?.username,
       })
     }
+
     init()
+  
+  // We turn off the listening to clean up resources and avoid multiple socket
 	return () => {
-		socketRef.current?.disconnect();
-		socketRef.current?.off(ACTIONS.JOINED)
-		socketRef.current?.off(ACTIONS.DISCONNECTED)
+		if (newSocket) {
+      newSocket.off("connect_error");
+      newSocket.off("connect_failed");
+      newSocket.off(ACTIONS.JOINED);
+      newSocket.off(ACTIONS.DISCONNECTED);
+      newSocket.disconnect();
+    }
 	}
 	
   },[])
@@ -85,7 +99,7 @@ const EditorPage = () => {
           <div className="flex flex-wrap gap-10 text-center">
             {clients.map((client) => (
               <Client
-                key={client.sockedId}
+                key={client.socketId}
                 username={client.username}
               />
             ))}
@@ -106,7 +120,7 @@ const EditorPage = () => {
 
       {/* Editor */}
       <div className="flex-1">
-        <Editor />
+        {socket && <Editor socket={socket} roomId={roomId} />}
       </div>
     </div>
   );

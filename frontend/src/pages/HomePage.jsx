@@ -75,13 +75,13 @@ const HomePage = () => {
 
         <p className="text-sm text-gray-400">
           If you don't have an invite then create {" "}
-          <a
+          <button
             onClick={createNewRoom}
-            href=""
+            type="button"
             className="text-green-400 hover:underline"
           >
             new room
-          </a>
+          </button>
         </p>
       </div>
 
