@@ -14,8 +14,11 @@ const EditorPage = () => {
   const [clients, setClients] = useState([]);
   const [socket, setSocket] = useState(null)
   const codeRef = useRef(null)
+  const [typer, setTyper] = useState("")
+  const typingRef = useRef(null)
   
-
+  
+  
   useEffect(() => {
     let newSocket;
     const init = async () => {
@@ -48,6 +51,16 @@ const EditorPage = () => {
           return prev.filter((client) => client.socketId !== socketId)
         })
       }
+
+      const handleTyping = ({username}) => {
+        setTyper(username)
+
+        clearTimeout(typingRef.current)
+
+        typingRef.current = setTimeout(() => {
+          setTyper("")
+        }, 1500)
+      }
       
       // Handling Errors
       newSocket.on("connect_error", handleErrors)
@@ -58,6 +71,8 @@ const EditorPage = () => {
 
       // Listening for Disconnected events
       newSocket.on(ACTIONS.DISCONNECTED, handleDisconnected)
+
+      newSocket.on(ACTIONS.TYPING, handleTyping)
 
       // Sending my information to server (socketId, roomId, username)
       newSocket.emit(ACTIONS.JOIN, {
@@ -124,8 +139,18 @@ const EditorPage = () => {
           </div>
         </div>
 
+        
+
         {/* Bottom Buttons */}
         <div className="space-y-3">
+          {/*Typing*/}
+          {typer && (
+            <div className="font-medium text-xl text-gray-300">
+              <span>{typer}</span>
+              <span className="ml-1 animate-pulse">•••</span>
+            </div>
+          )}
+
           <button onClick={handleCopyRoomId} className="w-full bg-gray-200 py-2 rounded-lg hover:bg-gray-100 text-black font-medium transition cursor-pointer">
             Copy Room ID
           </button>
@@ -138,7 +163,7 @@ const EditorPage = () => {
 
       {/* Editor */}
       <div className="flex-1">
-        {socket && <Editor socket={socket} roomId={roomId} onCodeChange={(code) => {codeRef.current = code}}/>}
+        {socket && <Editor socket={socket} roomId={roomId} onCodeChange={(code) => {codeRef.current = code}} username={location.state?.username}/>}
       </div>
     </div>
   );

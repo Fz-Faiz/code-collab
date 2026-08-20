@@ -58,6 +58,10 @@ io.on('connection', (socket) => {
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code })
     })
 
+    socket.on(ACTIONS.TYPING, ({username, roomId}) => {
+        socket.in(roomId).emit(ACTIONS.TYPING, {username})
+    })
+
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];
 

@@ -1,26 +1,25 @@
 import { useEffect, useRef } from 'react'
 import {EditorView, basicSetup} from "codemirror"
-import {javascript} from "@codemirror/lang-javascript"
+import {cpp } from "@codemirror/lang-cpp"
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { closeBrackets } from "@codemirror/autocomplete";
 import { html } from "@codemirror/lang-html";
 import { autoCloseTags } from "@codemirror/lang-html";
 import ACTIONS from '../action';
  
-const Editor = ({socket, roomId, onCodeChange}) => {
+const Editor = ({socket, roomId, onCodeChange, username}) => {
   const editorContainerRef = useRef(null);
   const editorViewRef = useRef(null);
   const isRemoteChange = useRef(false);
 
   useEffect(() => {
     const view = new EditorView({
-      doc: "",
+      doc: "int main(){ \n cout << \"Hello World\"; \n}",
       extensions: [
         basicSetup, 
-        javascript({
-          jsx: true,
-        }), 
+        cpp(), 
         vscodeDark, closeBrackets(), html(), autoCloseTags,
+
         EditorView.updateListener.of((update) => {
           if(!update.docChanged) return;
           if(isRemoteChange.current) return;
@@ -32,6 +31,14 @@ const Editor = ({socket, roomId, onCodeChange}) => {
           if(socket){
             socket.emit(ACTIONS.CODE_CHANGE, {
               code,
+              roomId
+            })
+          }
+
+          // Emit for typing
+          if(socket){
+            socket.emit(ACTIONS.TYPING, {
+              username,
               roomId
             })
           }
