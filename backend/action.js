@@ -6,6 +6,10 @@ const ACTIONS = {
     SYNC_CODE: 'sync-code',
     LEAVE: 'leave',
     TYPING: 'typing',
+    LANGUAGE: 'language',
+    COMPILE_CODE: 'compilecode',
+    CODE_RESPONSE: 'coderesponse',
+    SYNC_STATE: 'sync-state',
 };
 
 module.exports = ACTIONS

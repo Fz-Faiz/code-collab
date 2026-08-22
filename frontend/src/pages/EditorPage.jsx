@@ -5,6 +5,8 @@ import {initSocket} from "../socket.js"
 import ACTIONS from "../action.js";
 import {useLocation, useNavigate, Navigate, useParams} from 'react-router-dom'
 import toast from "react-hot-toast";
+import Output from "../components/Output.jsx";
+import { Loader2 } from "lucide-react";
 
 
 const EditorPage = () => {
@@ -13,10 +15,12 @@ const EditorPage = () => {
   const { roomId } = useParams();
   const [clients, setClients] = useState([]);
   const [socket, setSocket] = useState(null)
-  const codeRef = useRef(null)
+  const codeRef = useRef(" ")
   const [typer, setTyper] = useState("")
+  const [language, setLanguage] = useState("cpp")
   const typingRef = useRef(null)
-  
+  const [output, setOutput] = useState("Your output will appear here");
+  const [isRunning, setIsRunning] = useState(false);
   
   
   useEffect(() => {
@@ -52,6 +56,10 @@ const EditorPage = () => {
         })
       }
 
+      const handleSelectedLanguage = ({language}) => {
+        setLanguage(language)
+      }
+
       const handleTyping = ({username}) => {
         setTyper(username)
 
@@ -61,6 +69,25 @@ const EditorPage = () => {
           setTyper("")
         }, 1500)
       }
+
+      const handleCodeResponse = (data) => {
+          setIsRunning(false)
+          if (data.error) {
+            setOutput(
+              typeof data.error === "string"
+                ? data.error
+                : JSON.stringify(data.error)
+            );
+            return;
+          }
+
+          setOutput(
+            data.compile?.stderr ||
+            data.run?.stderr ||
+            data.run?.stdout ||
+            "No output"
+          );
+      };
       
       // Handling Errors
       newSocket.on("connect_error", handleErrors)
@@ -72,13 +99,21 @@ const EditorPage = () => {
       // Listening for Disconnected events
       newSocket.on(ACTIONS.DISCONNECTED, handleDisconnected)
 
+      // Listening for who is typing
       newSocket.on(ACTIONS.TYPING, handleTyping)
+
+      // Listening for Selected Language
+      newSocket.on(ACTIONS.LANGUAGE, handleSelectedLanguage)
+
+      newSocket.on(ACTIONS.CODE_RESPONSE, handleCodeResponse)
 
       // Sending my information to server (socketId, roomId, username)
       newSocket.emit(ACTIONS.JOIN, {
         roomId,
         username: location.state?.username,
       })
+
+      
     }
 
     init()
@@ -90,11 +125,29 @@ const EditorPage = () => {
       newSocket.off("connect_failed");
       newSocket.off(ACTIONS.JOINED);
       newSocket.off(ACTIONS.DISCONNECTED);
+      newSocket.off(ACTIONS.TYPING)
+      newSocket.off(ACTIONS.CODE_RESPONSE);
+      newSocket.off(ACTIONS.LANGUAGE)
       newSocket.disconnect();
     }
 	}
 	
   },[])
+
+  useEffect(() => {
+      if (!socket) return;
+
+      const handleSyncState = ({ language, code }) => {
+        setLanguage(language);
+        codeRef.current = code;
+      };
+
+      socket.on(ACTIONS.SYNC_STATE, handleSyncState);
+
+      return () => {
+        socket.off(ACTIONS.SYNC_STATE, handleSyncState);
+      };
+    }, [socket]); 
 
   const handleCopyRoomId = async () => {
     try {
@@ -108,6 +161,26 @@ const EditorPage = () => {
   
   const handleLeaveRoom = () => {
     reactNavigator('/')
+  }
+
+  const handleLanguageChange = (event) => {
+    const newlanguage = event.target.value
+    setLanguage(newlanguage)
+
+    // Sending Language
+    socket.emit(ACTIONS.LANGUAGE, {
+      language: newlanguage,
+      roomId
+    })
+  }
+
+  const runCode = () => {
+    setIsRunning(true)
+    socket.emit(ACTIONS.COMPILE_CODE, {
+        code : codeRef.current,
+        roomId,
+        language
+    })
   }
 
   if(!location.state){
@@ -162,10 +235,55 @@ const EditorPage = () => {
       </div>
 
       {/* Editor */}
-      <div className="flex-1">
-        {socket && <Editor socket={socket} roomId={roomId} onCodeChange={(code) => {codeRef.current = code}} username={location.state?.username}/>}
+      <div className="flex-1 min-w-0 h-screen flex flex-col">
+        {/* Navbar */}
+        <div className="flex items-center justify-between px-3 h-12 bg-gray-800 border-b border-gray-700">
+          
+          {/* Language Selector */}
+          <select
+            name="selectLanguage"
+            className="bg-gray-700 text-gray-100 px-3 py-1.5 rounded-md 
+                      outline-none border border-gray-600 cursor-pointer
+                      focus:border-blue-500"
+            value={language}
+            onChange={handleLanguageChange}
+          >
+            <option value="cpp">C++</option>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+          </select>
+
+          {/* Run Button */}
+          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 
+                            rounded-md cursor-pointer transition-colors duration-200 flex items-center text-center"
+                  onClick={runCode}
+                  disabled={isRunning}
+
+          >
+             {isRunning ? (
+                <>
+                  <Loader2 size={17} className="animate-spin" />
+                  Running
+                </>
+              ) : (
+                "Run Code"
+              )}
+          </button>
+
+        </div>
+
+        {/* Code Ediotr */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          {socket && <Editor socket={socket} roomId={roomId} onCodeChange={(code) => {codeRef.current = code}} username={location.state?.username} language={language}/>}
+        </div>
+        <Output output={output} />
       </div>
+        
+      
+     
     </div>
+     
   );
 };
 

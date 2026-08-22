@@ -12,10 +12,13 @@
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-java": "^6.0.2",
     "@codemirror/lang-javascript": "github:codemirror/lang-javascript",
+    "@codemirror/lang-python": "^6.2.1",
     "@tailwindcss/vite": "^4.3.0",
     "@uiw/codemirror-theme-vscode": "^4.25.11",
     "codemirror": "^6.0.2",
+    "lucide-react": "^1.33.0",
     "react": "^19.2.6",
     "react-avatar": "^5.0.4",
     "react-dom": "^19.2.6",

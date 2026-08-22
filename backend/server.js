@@ -3,6 +3,7 @@ const http = require("http")
 const { Server } = require("socket.io")
 const cors = require("cors")
 const ACTIONS = require("./action.js")
+const axios = require("axios")
 
 
 const PORT = 5000
@@ -21,6 +22,28 @@ app.use(cors());
 app.use(express.json());
 
 const userSocketMap = {};
+const roomState = {};
+const languageConfig = {
+  cpp: {
+    language: "c++",
+    version: "10.2.0",
+  },
+
+  javascript: {
+    language: "javascript",
+    version: "20.11.1",
+  },
+
+  python: {
+    language: "python",
+    version: "3.12.0",
+  },
+
+  java: {
+    language: "java",
+    version: "15.0.2",
+  },
+};
 
 function getAllConnectedClients(roomId){
     // Map
@@ -38,6 +61,9 @@ io.on('connection', (socket) => {
     socket.on(ACTIONS.JOIN, ({roomId, username})=>{
         userSocketMap[socket.id] = username;
         socket.join(roomId);
+        if (roomState[roomId]) {
+            socket.emit(ACTIONS.SYNC_STATE, roomState[roomId]);
+        }
         
         const clients = getAllConnectedClients(roomId);
 
@@ -50,9 +76,20 @@ io.on('connection', (socket) => {
         })
     })
 
-    socket.on(ACTIONS.CODE_CHANGE, ({roomId, code}) => {
-        socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code })
-    })
+    socket.on(ACTIONS.CODE_CHANGE, ({ code, roomId }) => {
+    if (!roomState[roomId]) {
+        roomState[roomId] = {
+        language: "cpp",
+        code: ""
+        };
+    }
+
+    roomState[roomId].code = code;
+
+    socket.in(roomId).emit(ACTIONS.CODE_CHANGE, {
+        code
+    });
+    });
 
     socket.on(ACTIONS.SYNC_CODE, ({code, socketId}) => {
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code })
@@ -61,6 +98,46 @@ io.on('connection', (socket) => {
     socket.on(ACTIONS.TYPING, ({username, roomId}) => {
         socket.in(roomId).emit(ACTIONS.TYPING, {username})
     })
+
+    socket.on(ACTIONS.LANGUAGE, ({ language, roomId }) => {
+    if (!roomState[roomId]) {
+        roomState[roomId] = {
+        language: "cpp",
+        code: ""
+        };
+    }
+
+    roomState[roomId].language = language;
+
+    socket.in(roomId).emit(ACTIONS.LANGUAGE, {
+        language
+    });
+    });
+
+    socket.on(ACTIONS.COMPILE_CODE, async ({ code, roomId,  language}) => {
+        try {
+            const runtime = languageConfig[language]
+            const response = await axios.post(
+                "http://localhost:2000/api/v2/execute",
+                {
+                    language: runtime.language,
+                    version: runtime.version,
+                    files: [
+                    {
+                        content: code,
+                    },
+                    ],
+                }
+            );
+            io.to(roomId).emit(ACTIONS.CODE_RESPONSE, response.data)
+        } catch (error) {
+            io.to(roomId).emit(ACTIONS.CODE_RESPONSE, {
+                error: error.response?.data || error.message,
+            })
+        }
+    })
+
+
 
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];

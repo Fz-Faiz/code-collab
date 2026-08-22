@@ -1,24 +1,49 @@
 import { useEffect, useRef } from 'react'
 import {EditorView, basicSetup} from "codemirror"
 import {cpp } from "@codemirror/lang-cpp"
+import {javascript } from "@codemirror/lang-javascript"
+import {python } from "@codemirror/lang-python"
+import {java } from "@codemirror/lang-java"
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { closeBrackets } from "@codemirror/autocomplete";
 import { html } from "@codemirror/lang-html";
 import { autoCloseTags } from "@codemirror/lang-html";
 import ACTIONS from '../action';
- 
-const Editor = ({socket, roomId, onCodeChange, username}) => {
+
+
+const template = {
+  cpp: "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello World\";\n    return 0;\n}",
+
+  javascript: "console.log(\"Hello World\");",
+
+  python: "print(\"Hello World\")",
+
+  java: "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello World\");\n    }\n}"
+};
+
+const languageExtension = {
+  cpp: cpp,
+  javascript: javascript,
+  python: python,
+  java: java,
+}
+
+const Editor = ({socket, roomId, onCodeChange, username, language}) => {
   const editorContainerRef = useRef(null);
   const editorViewRef = useRef(null);
   const isRemoteChange = useRef(false);
 
+  const handleSelectedLanguageExtension = () => {
+    return languageExtension[language]();
+  }
+
   useEffect(() => {
     const view = new EditorView({
-      doc: "int main(){ \n cout << \"Hello World\"; \n}",
+      doc: onCodeChange(template[language]),
       extensions: [
-        basicSetup, 
-        cpp(), 
-        vscodeDark, closeBrackets(), html(), autoCloseTags,
+        basicSetup,
+        handleSelectedLanguageExtension(),
+        vscodeDark, closeBrackets(), html(), autoCloseTags, EditorView.lineWrapping,
 
         EditorView.updateListener.of((update) => {
           if(!update.docChanged) return;
@@ -51,7 +76,8 @@ const Editor = ({socket, roomId, onCodeChange, username}) => {
     return () => {
       view.destroy();
     }
-  },[])
+  },[language])
+
   useEffect(() => {
     const handleCodeChange = ({ code }) => {
       
@@ -63,7 +89,6 @@ const Editor = ({socket, roomId, onCodeChange, username}) => {
 
       if(currentCode == code) return;
 
-
       // We did this to prevent remote changes to prevent updateListener fires (we will stuck in a loop)
       // only local changes +input we send to server
       isRemoteChange.current = true;
@@ -71,17 +96,40 @@ const Editor = ({socket, roomId, onCodeChange, username}) => {
       editorViewRef.current.dispatch({
         changes:{
           from: 0,
-          to: currentCode.length,
+          to: editorViewRef.current.state.doc.length,
           insert: code,
         },
       });
-
+      onCodeChange(code);
       isRemoteChange.current = false;
     }
     
     socket.on(ACTIONS.CODE_CHANGE, handleCodeChange);
    
   },[socket, roomId])
+
+  useEffect(() => {
+      const view = editorViewRef.current;
+
+      if (!view) return;
+
+      const newCode = template[language] || "";
+
+      isRemoteChange.current = true;
+
+      view.dispatch({
+        changes: {
+          from: 0,
+          to: view.state.doc.length,
+          insert: newCode,
+        },
+      });
+
+      isRemoteChange.current = false;
+
+      onCodeChange(newCode);
+
+    }, [language]);
 
   return (
     <div ref={editorContainerRef}></div>
