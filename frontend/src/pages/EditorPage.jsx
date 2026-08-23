@@ -71,24 +71,28 @@ const EditorPage = () => {
       }
 
       const handleCodeResponse = (data) => {
-          setIsRunning(false)
-          if (data.error) {
-            setOutput(
-              typeof data.error === "string"
-                ? data.error
-                : JSON.stringify(data.error)
-            );
-            return;
-          }
+        setIsRunning(false);
 
+        if (data.error) {
           setOutput(
-            data.compile?.stderr ||
-            data.run?.stderr ||
-            data.run?.stdout ||
-            "No output"
+            typeof data.error === "string"
+              ? data.error
+              : JSON.stringify(data.error)
           );
+          return;
+        }
+
+        if (data.stderr) {
+          setOutput(data.stderr);
+        } else if (data.exception) {
+          setOutput(data.exception);
+        } else if (data.stdout !== null && data.stdout !== undefined) {
+          setOutput(data.stdout);
+        } else {
+          setOutput("No output");
+        }
       };
-      
+              
       // Handling Errors
       newSocket.on("connect_error", handleErrors)
       newSocket.on("connect_failed", handleErrors)

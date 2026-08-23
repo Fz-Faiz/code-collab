@@ -28,7 +28,7 @@ const Output = ({ output }) => {
 
   return (
     <div
-      className="shrink-0 border-t border-gray-700 bg-[#0D1117]"
+      className="shrink-0 overflow-hidden border-t border-gray-700 bg-[#0D1117] flex flex-col"
       style={{
         height: isOutputOpen ? `${outputHeight}px` : "40px"
       }}
@@ -37,12 +37,12 @@ const Output = ({ output }) => {
       {isOutputOpen && (
         <div
           onMouseDown={handleMouseDown}
-          className="h-1 cursor-row-resize hover:bg-blue-500"
+          className="h-1 shrink-0 cursor-row-resize hover:bg-blue-500"
         />
       )}
 
       {/* Output Header */}
-      <div className="h-10 px-4 flex items-center justify-between bg-[#161B22]">
+      <div className="h-10 shrink-0 px-4 flex items-center justify-between bg-[#161B22]">
         <span className="text-sm font-semibold text-gray-300">
           OUTPUT
         </span>
@@ -61,7 +61,7 @@ const Output = ({ output }) => {
 
       {/* Output Content */}
       {isOutputOpen && (
-        <pre className="overflow-auto p-4 text-sm text-gray-200 whitespace-pre-wrap">
+        <pre className="flex-1 min-h-0 overflow-auto p-4 text-sm text-gray-200 whitespace-pre-wrap break-words">
           {output || "Run your code to see the output..."}
         </pre>
       )}

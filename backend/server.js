@@ -4,14 +4,23 @@ const { Server } = require("socket.io")
 const cors = require("cors")
 const ACTIONS = require("./action.js")
 const axios = require("axios")
+const dotenv  = require("dotenv")
 
 
-const PORT = 5000
+dotenv.config()
+
+const PORT = process.env.PORT || 5000
 const app = express()
 const server = http.createServer(app)
+
+allowedOrigins = [
+    "http://localhost:5173",
+    process.env.FRONTEND_URL,
+].filter(Boolean)
+
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173",
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -23,27 +32,29 @@ app.use(express.json());
 
 const userSocketMap = {};
 const roomState = {};
+
 const languageConfig = {
   cpp: {
-    language: "c++",
-    version: "10.2.0",
+    language: "cpp",
+    fileName: "main.cpp",
   },
 
   javascript: {
     language: "javascript",
-    version: "20.11.1",
+    fileName: "main.js",
   },
 
   python: {
     language: "python",
-    version: "3.12.0",
+    fileName: "main.py",
   },
 
   java: {
     language: "java",
-    version: "15.0.2",
+    fileName: "Main.java",
   },
 };
+
 
 function getAllConnectedClients(roomId){
     // Map
@@ -114,28 +125,51 @@ io.on('connection', (socket) => {
     });
     });
 
-    socket.on(ACTIONS.COMPILE_CODE, async ({ code, roomId,  language}) => {
+    socket.on( ACTIONS.COMPILE_CODE, async ({ code, roomId, language }) => {
         try {
-            const runtime = languageConfig[language]
+            const runtime = languageConfig[language];
+
+            if (!runtime) {
+                throw new Error("Unsupported language");
+            }
+            console.log("API KEY EXISTS:", !!process.env.ONECOMPILER_API_KEY);
             const response = await axios.post(
-                "http://localhost:2000/api/v2/execute",
+                "https://api.onecompiler.com/v1/run",
                 {
-                    language: runtime.language,
-                    version: runtime.version,
-                    files: [
+                language: runtime.language,
+
+                files: [
                     {
-                        content: code,
+                    name: runtime.fileName,
+                    content: code,
                     },
-                    ],
+                ],
+                },
+                {
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-API-Key": process.env.ONECOMPILER_API_KEY,
+                },
                 }
             );
-            io.to(roomId).emit(ACTIONS.CODE_RESPONSE, response.data)
+            console.log("OneCompiler response:", response.data);
+            io.to(roomId).emit(
+                ACTIONS.CODE_RESPONSE,
+                response.data
+            );
+
         } catch (error) {
+            console.log(
+                "OneCompiler Error:",
+                error.response?.data || error.message
+            );
+
             io.to(roomId).emit(ACTIONS.CODE_RESPONSE, {
                 error: error.response?.data || error.message,
-            })
+            });
+            }
         }
-    })
+        );
 
 
 
