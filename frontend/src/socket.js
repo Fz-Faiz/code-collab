@@ -1,5 +1,5 @@
 import {io} from 'socket.io-client';
 
 export const initSocket = async () => {
-    return io("http://localhost:5000");
+    return io("https://code-collab-th6k.onrender.com");
 }
