@@ -90,8 +90,9 @@ io.on('connection', (socket) => {
     socket.on(ACTIONS.CODE_CHANGE, ({ code, roomId }) => {
     if (!roomState[roomId]) {
         roomState[roomId] = {
-        language: "cpp",
-        code: ""
+            language: "cpp",
+            code: "",
+            input: "",
         };
     }
 
@@ -113,8 +114,9 @@ io.on('connection', (socket) => {
     socket.on(ACTIONS.LANGUAGE, ({ language, roomId }) => {
     if (!roomState[roomId]) {
         roomState[roomId] = {
-        language: "cpp",
-        code: ""
+            language: "cpp",
+            code: "",
+            input: "",
         };
     }
 
@@ -125,18 +127,25 @@ io.on('connection', (socket) => {
     });
     });
 
-    socket.on( ACTIONS.COMPILE_CODE, async ({ code, roomId, language }) => {
-        try {
+
+    socket.on( ACTIONS.COMPILE_CODE, async ({ code, roomId, language, input }) => {
+            try {
             const runtime = languageConfig[language];
 
             if (!runtime) {
                 throw new Error("Unsupported language");
             }
+
+            
+
             console.log("API KEY EXISTS:", !!process.env.ONECOMPILER_API_KEY);
+
             const response = await axios.post(
                 "https://api.onecompiler.com/v1/run",
                 {
                 language: runtime.language,
+
+                stdin: input || "",
 
                 files: [
                     {
@@ -152,13 +161,15 @@ io.on('connection', (socket) => {
                 },
                 }
             );
+
             console.log("OneCompiler response:", response.data);
+
             io.to(roomId).emit(
                 ACTIONS.CODE_RESPONSE,
                 response.data
             );
 
-        } catch (error) {
+            } catch (error) {
             console.log(
                 "OneCompiler Error:",
                 error.response?.data || error.message
@@ -170,6 +181,26 @@ io.on('connection', (socket) => {
             }
         }
         );
+
+    socket.on(ACTIONS.INPUT_CHANGE, ({ input, roomId }) => {
+
+        // Create room state if it doesn't exist
+        if (!roomState[roomId]) {
+            roomState[roomId] = {
+            language: "cpp",
+            code: "",
+            input: "",
+            };
+        }
+
+        // Save input for users who join later
+        roomState[roomId].input = input;
+
+        // Send input to everyone in the room except sender
+        socket.in(roomId).emit(ACTIONS.INPUT_CHANGE, {
+            input,
+        });
+    });
 
 
 

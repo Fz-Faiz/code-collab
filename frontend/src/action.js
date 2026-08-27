@@ -10,6 +10,7 @@ const ACTIONS = {
     LANGUAGE: 'language',
     COMPILE_CODE: 'compilecode',
     CODE_RESPONSE: 'coderesponse',
+    INPUT_CHANGE: "input-change",
 };
 
 export default ACTIONS

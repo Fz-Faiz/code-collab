@@ -8,6 +8,8 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { closeBrackets } from "@codemirror/autocomplete";
 import { html } from "@codemirror/lang-html";
 import { autoCloseTags } from "@codemirror/lang-html";
+import { indentWithTab } from "@codemirror/commands";
+import { keymap } from "@codemirror/view";
 import ACTIONS from '../action';
 
 
@@ -43,6 +45,7 @@ const Editor = ({socket, roomId, onCodeChange, username, language}) => {
       extensions: [
         basicSetup,
         handleSelectedLanguageExtension(),
+        keymap.of([indentWithTab]),
         vscodeDark, closeBrackets(), html(), autoCloseTags, EditorView.lineWrapping,
 
         EditorView.updateListener.of((update) => {

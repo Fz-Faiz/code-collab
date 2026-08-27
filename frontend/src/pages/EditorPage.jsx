@@ -21,6 +21,7 @@ const EditorPage = () => {
   const typingRef = useRef(null)
   const [output, setOutput] = useState("Your output will appear here");
   const [isRunning, setIsRunning] = useState(false);
+  const [input, setInput] = useState("");
   
   
   useEffect(() => {
@@ -70,7 +71,7 @@ const EditorPage = () => {
         }, 1500)
       }
 
-      const handleCodeResponse = (data) => {
+  const handleCodeResponse = (data) => {
         setIsRunning(false);
 
         if (data.error) {
@@ -82,17 +83,39 @@ const EditorPage = () => {
           return;
         }
 
+        if (data.exception) {
+          setOutput(data.exception);
+          return;
+        }
+
+        if (data.compile?.stderr) {
+          setOutput(data.compile.stderr);
+          return;
+        }
+
+        if (data.run?.stderr) {
+          setOutput(data.run.stderr);
+          return;
+        }
+
         if (data.stderr) {
           setOutput(data.stderr);
-        } else if (data.exception) {
-          setOutput(data.exception);
-        } else if (data.stdout !== null && data.stdout !== undefined) {
-          setOutput(data.stdout);
-        } else {
-          setOutput("No output");
+          return;
         }
+
+        if (data.stdout !== null && data.stdout !== undefined) {
+          setOutput(data.stdout);
+          return;
+        }
+
+        if (data.run?.stdout) {
+          setOutput(data.run.stdout);
+          return;
+        }
+
+        setOutput("No output");
       };
-              
+                    
       // Handling Errors
       newSocket.on("connect_error", handleErrors)
       newSocket.on("connect_failed", handleErrors)
@@ -141,7 +164,22 @@ const EditorPage = () => {
   useEffect(() => {
       if (!socket) return;
 
-      const handleSyncState = ({ language, code }) => {
+      const handleInputChange = ({ input }) => {
+        setInput(input);
+      };
+
+      socket.on(ACTIONS.INPUT_CHANGE, handleInputChange);
+
+      return () => {
+        socket.off(ACTIONS.INPUT_CHANGE, handleInputChange);
+      };
+  }, [socket]);
+
+  useEffect(() => {
+      if (!socket) return;
+
+      const handleSyncState = ({ language, code, input }) => {
+        setInput(input || "")
         setLanguage(language);
         codeRef.current = code;
       };
@@ -183,7 +221,8 @@ const EditorPage = () => {
     socket.emit(ACTIONS.COMPILE_CODE, {
         code : codeRef.current,
         roomId,
-        language
+        language,
+        input
     })
   }
 
@@ -281,7 +320,7 @@ const EditorPage = () => {
         <div className="flex-1 min-h-0 overflow-auto">
           {socket && <Editor socket={socket} roomId={roomId} onCodeChange={(code) => {codeRef.current = code}} username={location.state?.username} language={language}/>}
         </div>
-        <Output output={output} />
+        <Output output={output} input={input} setInput={setInput} socket={socket} roomId={roomId} />
       </div>
         
       

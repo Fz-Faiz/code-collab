@@ -10,6 +10,7 @@ const ACTIONS = {
     COMPILE_CODE: 'compilecode',
     CODE_RESPONSE: 'coderesponse',
     SYNC_STATE: 'sync-state',
+    INPUT_CHANGE: "input-change",
 };
 
 module.exports = ACTIONS
