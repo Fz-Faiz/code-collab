@@ -46,7 +46,7 @@ A full-stack real-time collaborative coding platform that enables multiple users
 
 <!-- Add your project screenshot here -->
 
-![Code Collab](YOUR_IMAGE_LINK)
+![Code Collab](https://github.com/Fz-Faiz/code-collab/blob/main/images/Screenshot%202026-09-01%20165953.png)
 
 ## 💡 Why This Project Matters
 
