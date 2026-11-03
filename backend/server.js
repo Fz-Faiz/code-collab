@@ -1,228 +1,95 @@
-const express = require("express")
-const http = require("http")
-const { Server } = require("socket.io")
-const cors = require("cors")
-const ACTIONS = require("./action.js")
-const axios = require("axios")
-const dotenv  = require("dotenv")
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
+const dotenv = require("dotenv");
 
+const connectDB = require("./config/db");
+const initEditorSocket = require("./sockets/editorSocket");
+const healthRoutes = require("./routes/healthRoutes");
+const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const classroomRoutes = require("./routes/classroomRoutes");
+const questionRoutes = require("./routes/questionRoutes");
+const submissionRoutes = require("./routes/submissionRoutes");
+const tutorRoutes = require("./routes/tutorRoutes");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
-dotenv.config()
+const path = require("path");
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
-const PORT = process.env.PORT || 5000
-const app = express()
-const server = http.createServer(app)
+const PORT = process.env.PORT || 5000;
+const app = express();
+const server = http.createServer(app);
 
-allowedOrigins = [
-    "http://localhost:5173",
-    process.env.FRONTEND_URL,
-].filter(Boolean)
+// Parse FRONTEND_URL supporting comma-separated origins and stripping trailing slashes
+const rawFrontendOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+const allowedOrigins = Array.from(
+  new Set(["http://localhost:5173", ...rawFrontendOrigins])
+);
 
 const io = new Server(server, {
-    cors: {
-        origin: allowedOrigins,
-        methods: ["GET", "POST"],
-        credentials: true
-    }
-})
-
-
-app.use(cors());
-app.use(express.json());
-
-const userSocketMap = {};
-const roomState = {};
-
-const languageConfig = {
-  cpp: {
-    language: "cpp",
-    fileName: "main.cpp",
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
   },
-
-  javascript: {
-    language: "javascript",
-    fileName: "main.js",
-  },
-
-  python: {
-    language: "python",
-    fileName: "main.py",
-  },
-
-  java: {
-    language: "java",
-    fileName: "Main.java",
-  },
-};
-
-
-function getAllConnectedClients(roomId){
-    // Map
-    return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map((socketId) => {
-        return {
-            socketId,
-            username: userSocketMap[socketId]
-        };
-    });
-};
-
-io.on('connection', (socket) => {
-    console.log('socket connected', socket.id)
-
-    socket.on(ACTIONS.JOIN, ({roomId, username})=>{
-        userSocketMap[socket.id] = username;
-        socket.join(roomId);
-        if (roomState[roomId]) {
-            socket.emit(ACTIONS.SYNC_STATE, roomState[roomId]);
-        }
-        
-        const clients = getAllConnectedClients(roomId);
-
-        clients.forEach(({socketId}) => {
-            io.to(socketId).emit(ACTIONS.JOINED, {
-                clients,
-                username,
-                socketId: socket.id
-            })
-        })
-    })
-
-    socket.on(ACTIONS.CODE_CHANGE, ({ code, roomId }) => {
-    if (!roomState[roomId]) {
-        roomState[roomId] = {
-            language: "cpp",
-            code: "",
-            input: "",
-        };
-    }
-
-    roomState[roomId].code = code;
-
-    socket.in(roomId).emit(ACTIONS.CODE_CHANGE, {
-        code
-    });
-    });
-
-    socket.on(ACTIONS.SYNC_CODE, ({code, socketId}) => {
-        io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code })
-    })
-
-    socket.on(ACTIONS.TYPING, ({username, roomId}) => {
-        socket.in(roomId).emit(ACTIONS.TYPING, {username})
-    })
-
-    socket.on(ACTIONS.LANGUAGE, ({ language, roomId }) => {
-    if (!roomState[roomId]) {
-        roomState[roomId] = {
-            language: "cpp",
-            code: "",
-            input: "",
-        };
-    }
-
-    roomState[roomId].language = language;
-
-    socket.in(roomId).emit(ACTIONS.LANGUAGE, {
-        language
-    });
-    });
-
-
-    socket.on( ACTIONS.COMPILE_CODE, async ({ code, roomId, language, input }) => {
-            try {
-            const runtime = languageConfig[language];
-
-            if (!runtime) {
-                throw new Error("Unsupported language");
-            }
-
-            
-
-            console.log("API KEY EXISTS:", !!process.env.ONECOMPILER_API_KEY);
-
-            const response = await axios.post(
-                "https://api.onecompiler.com/v1/run",
-                {
-                language: runtime.language,
-
-                stdin: input || "",
-
-                files: [
-                    {
-                    name: runtime.fileName,
-                    content: code,
-                    },
-                ],
-                },
-                {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-API-Key": process.env.ONECOMPILER_API_KEY,
-                },
-                }
-            );
-
-            console.log("OneCompiler response:", response.data);
-
-            io.to(roomId).emit(
-                ACTIONS.CODE_RESPONSE,
-                response.data
-            );
-
-            } catch (error) {
-            console.log(
-                "OneCompiler Error:",
-                error.response?.data || error.message
-            );
-
-            io.to(roomId).emit(ACTIONS.CODE_RESPONSE, {
-                error: error.response?.data || error.message,
-            });
-            }
-        }
-        );
-
-    socket.on(ACTIONS.INPUT_CHANGE, ({ input, roomId }) => {
-
-        // Create room state if it doesn't exist
-        if (!roomState[roomId]) {
-            roomState[roomId] = {
-            language: "cpp",
-            code: "",
-            input: "",
-            };
-        }
-
-        // Save input for users who join later
-        roomState[roomId].input = input;
-
-        // Send input to everyone in the room except sender
-        socket.in(roomId).emit(ACTIONS.INPUT_CHANGE, {
-            input,
-        });
-    });
-
-
-
-    socket.on('disconnecting', () => {
-        const rooms = [...socket.rooms];
-
-        rooms.forEach((roomId) => {
-            socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
-                socketId: socket.id,
-                username: userSocketMap[socket.id],
-            })
-        })
-
-        delete userSocketMap[socket.id];
-        socket.leave();
-    })
-
-
 });
 
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+app.use(express.json());
 
-server.listen(PORT, () => {
-    console.log(`Server started at Port: ${PORT}`)
-})
+// API Routes & Health endpoints (supports Render default /health and /api/health)
+app.use("/", healthRoutes);
+app.use("/api", healthRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/classrooms", classroomRoutes);
+app.use("/api/questions", questionRoutes);
+app.use("/api/submissions", submissionRoutes);
+app.use("/api/tutor", tutorRoutes);
 
+// Initialize Socket.io Editor handlers (Module A - Multiplayer)
+initEditorSocket(io);
+
+// Centralized Error Handling Middleware
+app.use(notFound);
+app.use(errorHandler);
+
+// Global unhandled error handlers to avoid unexpected server crashes
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+});
+
+// Async server startup: guarantee database connects before listening
+const startServer = async () => {
+  try {
+    await connectDB();
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "FATAL: Server startup aborted due to MongoDB connection failure in production."
+      );
+      process.exit(1);
+    }
+  }
+
+  server.listen(PORT, () => {
+    console.log(`Server started at Port: ${PORT}`);
+  });
+};
+
+startServer();
+
+module.exports = { app, server, io, startServer };
